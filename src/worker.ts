@@ -1,32 +1,35 @@
-/**
- * Welcome to Cloudflare Workers! This is your first worker.
- *
- * - Run `npm run dev` in your terminal to start a development server
- * - Open a browser tab at http://localhost:8787/ to see your worker in action
- * - Run `npm run deploy` to publish your worker
- *
- * Learn more at https://developers.cloudflare.com/workers/
- */
+import { QdrantClient } from '@qdrant/js-client-rest';
+import { Hono } from 'hono';
 
 export interface Env {
-	// Example binding to KV. Learn more at https://developers.cloudflare.com/workers/runtime-apis/kv/
-	// MY_KV_NAMESPACE: KVNamespace;
-	//
-	// Example binding to Durable Object. Learn more at https://developers.cloudflare.com/workers/runtime-apis/durable-objects/
-	// MY_DURABLE_OBJECT: DurableObjectNamespace;
-	//
-	// Example binding to R2. Learn more at https://developers.cloudflare.com/workers/runtime-apis/r2/
-	// MY_BUCKET: R2Bucket;
-	//
-	// Example binding to a Service. Learn more at https://developers.cloudflare.com/workers/runtime-apis/service-bindings/
-	// MY_SERVICE: Fetcher;
-	//
-	// Example binding to a Queue. Learn more at https://developers.cloudflare.com/queues/javascript-apis/
-	// MY_QUEUE: Queue;
+	QDRANT_API_KEY: string;
+	QDRANT_CLUSTER: string;
 }
 
 export default {
-	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-		return new Response('Hello World!');
+	async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+		// Initializes a new Qdrant Cloud client against our cluster
+		const client = new QdrantClient({
+			url: env.QDRANT_CLUSTER,
+			apiKey: env.QDRANT_API_KEY,
+		});
+
+		const app = new Hono();
+
+		app.onError((err, c) => {
+			console.error(err);
+			return c.json({ error: err }, 500);
+		});
+
+		app.get('/api/collections', async (c) => {
+			let resp = await client.getCollections();
+			return c.json(resp);
+		});
+
+		app.get('/', async (c) => {
+			return c.json({});
+		});
+
+		return app.fetch(req, env, ctx);
 	},
 };
